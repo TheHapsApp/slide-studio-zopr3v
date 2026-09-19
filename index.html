@@ -840,12 +840,21 @@
     // a duration shorter than the transition itself makes advanceSlideshow() fire again before
     // the in-flight transition finishes, stomping its classes/z-index mid-animation so slides
     // just jump with no visible animation at all.
-    var MIN_SLIDE_DURATION_MS = 1000;
+    // How long a transition actually needs to finish playing before the NEXT advance can safely
+    // fire — "none" is a true instant cut now (see applyStandardTransition), so it needs no floor
+    // at all; fade/slide/zoom need PLAYER_TRANSITION_MS, dissolve needs the longer DISSOLVE_TOTAL_MS.
+    // Only used at actual playback time (schedulePlayerAdvance) — the editor input below stores
+    // exactly what's typed, unmodified, so switching slides and coming back always shows the real
+    // saved value instead of a silently-floored one.
+    function minDurationForTransition(transitionType) {
+      if (transitionType === "none") return 0;
+      if (transitionType === "dissolve") return DISSOLVE_TOTAL_MS + 100;
+      return PLAYER_TRANSITION_MS + 100;
+    }
     function currentDurationInputMs() {
       var v = parseFloat(document.getElementById("durationInput").value);
       if (isNaN(v) || v < 0) v = 0;
-      var ms = Math.round(durationUnitIsMs ? v : v * 1000);
-      return Math.max(MIN_SLIDE_DURATION_MS, ms);
+      return Math.round(durationUnitIsMs ? v : v * 1000);
     }
     function renderDurationInput() {
       var ms = currentSlide().duration || PLAYER_ADVANCE_MS;
@@ -883,7 +892,12 @@
     function schedulePlayerAdvance() {
       if (playerTimer) clearTimeout(playerTimer);
       var dur = (slides[playerIndex] && slides[playerIndex].duration) || PLAYER_ADVANCE_MS;
-      dur = Math.max(MIN_SLIDE_DURATION_MS, dur); // safety net for any duration saved before this floor existed
+      // The transition that will play when THIS slide's timer fires is the upcoming slide's own
+      // transition (see advanceSlideshow: transitionType = nextSlide.transition) — that's what
+      // needs to fit inside this slide's dwell time, not this slide's own transition.
+      var nextIndex = (playerIndex + 1) % slides.length;
+      var nextTransition = slides[nextIndex] ? slides[nextIndex].transition : "fade";
+      dur = Math.max(minDurationForTransition(nextTransition), dur);
       playerTimer = setTimeout(advanceSlideshow, dur);
     }
     // "Dissolve": random little squares of the outgoing slide reveal the incoming slide underneath,
