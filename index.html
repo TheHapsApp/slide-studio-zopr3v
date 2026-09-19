@@ -66,8 +66,18 @@
       cursor: grab; padding: 2px 6px; max-width: 90%;
     }
 
-    #toolRow { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-bottom: 8px; }
+    #toolRow { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; margin-bottom: 8px; }
     #toolRow .btn { font-size: 0.82rem; padding: 8px 10px; }
+    .durationRow {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,255,255,0.14); border: 3px solid #fff; border-radius: 14px;
+      padding: 6px 10px; font-size: 0.82rem; font-weight: bold;
+    }
+    #durationInput {
+      width: 52px; font-family: inherit; font-size: 0.85rem; font-weight: bold; text-align: center;
+      padding: 4px 2px; border-radius: 8px; border: 2px solid #fff;
+      background: rgba(255,255,255,0.95); color: #2a1a3e;
+    }
 
     #slideFilmstrip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 10px; }
     .slideThumb {
@@ -183,7 +193,11 @@
     <div id="toolRow">
       <button class="btn" id="addTextBtn">🔤 Add Text</button>
       <button class="btn" id="transitionBtn">🎞️ Fade</button>
-      <button class="btn" id="durationBtn">⏱️ 4s</button>
+      <div class="durationRow" id="durationRow" title="Type a number, or press the left arrow key to switch between seconds and milliseconds">
+        <span>⏱️</span>
+        <input type="number" id="durationInput" min="0" step="1" inputmode="numeric">
+        <span id="durationUnitLabel">sec</span>
+      </div>
       <button class="btn danger" id="deleteSlideBtn">🗑️ Delete Slide</button>
     </div>
     <div id="slideFilmstrip"></div>
@@ -287,7 +301,6 @@
     var TRANSITIONS = ["none", "fade", "slide", "zoom", "dissolve"];
     var TRANSITION_LABELS = { none: "✋ None", fade: "🌫️ Fade", slide: "➡️ Slide", zoom: "🔍 Zoom", dissolve: "🧩 Dissolve" };
     var PLAYER_ADVANCE_MS = 4000;
-    var DURATION_OPTIONS = [2000, 3000, 4000, 5000, 6000, 8000, 10000];
     var PLAYER_TRANSITION_MS = 600;
     var DISSOLVE_COLS = 8;
     var DISSOLVE_ROWS = 6;
@@ -564,7 +577,7 @@
     function renderEditorSlide() {
       renderSlideInto(document.getElementById("slideCanvas"), currentSlide(), true);
       document.getElementById("transitionBtn").textContent = "🎞️ " + TRANSITION_LABELS[currentSlide().transition];
-      document.getElementById("durationBtn").textContent = "⏱️ " + ((currentSlide().duration || PLAYER_ADVANCE_MS) / 1000) + "s";
+      renderDurationInput();
       document.getElementById("deleteSlideBtn").disabled = slides.length <= 1;
     }
     function renderFilmstrip() {
@@ -819,12 +832,19 @@
     }
 
     // ---------------- slide duration (how long this slide stays up in the player) ----------------
-    function cycleDuration() {
-      var s = currentSlide();
-      var idx = DURATION_OPTIONS.indexOf(s.duration || PLAYER_ADVANCE_MS);
-      s.duration = DURATION_OPTIONS[(idx + 1) % DURATION_OPTIONS.length];
-      document.getElementById("durationBtn").textContent = "⏱️ " + (s.duration / 1000) + "s";
-      persistProject();
+    // Typed directly as a number of seconds by default; pressing the left-arrow key while the
+    // input is focused flips the unit to milliseconds (and back again on a second press), taking
+    // over that key's normal cursor-move behavior so it always acts as the unit toggle.
+    var durationUnitIsMs = false;
+    function currentDurationInputMs() {
+      var v = parseFloat(document.getElementById("durationInput").value);
+      if (isNaN(v) || v < 0) v = 0;
+      return Math.round(durationUnitIsMs ? v : v * 1000);
+    }
+    function renderDurationInput() {
+      var ms = currentSlide().duration || PLAYER_ADVANCE_MS;
+      document.getElementById("durationInput").value = durationUnitIsMs ? ms : ms / 1000;
+      document.getElementById("durationUnitLabel").textContent = durationUnitIsMs ? "ms" : "sec";
     }
 
     // ---------------- transitions ----------------
@@ -1003,7 +1023,19 @@
     document.getElementById("drawDoneBtn").addEventListener("click", saveDrawing);
     document.getElementById("addTextBtn").addEventListener("click", addTextBox);
     document.getElementById("transitionBtn").addEventListener("click", cycleTransition);
-    document.getElementById("durationBtn").addEventListener("click", cycleDuration);
+    document.getElementById("durationInput").addEventListener("input", function () {
+      currentSlide().duration = currentDurationInputMs();
+      persistProject();
+    });
+    document.getElementById("durationInput").addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowLeft") return;
+      e.preventDefault();
+      var ms = currentDurationInputMs(); // read the typed value under the OLD unit before flipping
+      durationUnitIsMs = !durationUnitIsMs;
+      currentSlide().duration = ms;
+      renderDurationInput();
+      persistProject();
+    });
     document.getElementById("deleteSlideBtn").addEventListener("click", deleteCurrentSlide);
     document.getElementById("textDoneBtn").addEventListener("click", saveTextEdit);
     document.getElementById("textDeleteBtn").addEventListener("click", deleteEditingText);
