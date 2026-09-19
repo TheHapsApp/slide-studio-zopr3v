@@ -39,10 +39,24 @@
 
     #appWrap { max-width: 420px; margin: 0 auto; }
 
+    #topBar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    #menuBtn { font-size: 0.85rem; padding: 7px 12px; }
+    #projectNameLabel {
+      flex: 1; font-weight: bold; font-size: 0.95rem; text-align: left;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+      border-bottom: 2px dashed rgba(255,255,255,0.5);
+    }
+
     #slideStageWrap {
       width: 100%; aspect-ratio: 4 / 3; position: relative;
       border: 5px solid #fff; border-radius: 16px; overflow: hidden;
       background: #333; margin-bottom: 8px;
+    }
+    #bgTypeBtn {
+      position: absolute; top: 8px; left: 8px; z-index: 5;
+      font-size: 0.75rem; padding: 6px 10px; margin: 0;
+      background: rgba(0,0,0,0.45); color: #fff; border: 2px solid #fff;
+      box-shadow: none;
     }
     #slideCanvas, .slideBgImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
     .textBoxEl {
@@ -74,13 +88,51 @@
     }
 
     /* ---- overlays ---- */
-    #bgPickerOverlay, #drawOverlay, #textEditOverlay {
+    #bgPickerOverlay, #drawOverlay, #textEditOverlay, #bgTypeOverlay, #photoSearchOverlay, #menuOverlay, #projectNameOverlay {
       display: none; position: fixed; inset: 0; z-index: 50;
       align-items: center; justify-content: center; flex-direction: column; gap: 10px;
-      background: rgba(20, 10, 30, 0.92); padding: 16px;
+      background: rgba(20, 10, 30, 0.92); padding: 16px; overflow-y: auto;
     }
     #bgPickerGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 340px; }
     .bgSwatch { height: 52px; border-radius: 10px; border: 3px solid #fff; cursor: pointer; padding: 0; }
+    .bgSwatch:hover, .photoThumbBtn:hover { outline: 3px solid #ffd76b; outline-offset: 2px; }
+
+    #bgTypeOverlay .btn { width: 100%; max-width: 280px; font-size: 1rem; padding: 14px; }
+
+    #photoSearchRow { display: flex; gap: 6px; width: 100%; max-width: 360px; }
+    #photoSearchInput {
+      flex: 1; font-family: inherit; font-size: 1rem; padding: 9px 12px;
+      border-radius: 12px; border: 3px solid #fff; background: rgba(255,255,255,0.95); color: #2a1a3e;
+    }
+    #photoSearchStatus { font-size: 0.85rem; min-height: 1.3em; opacity: 0.9; }
+    #photoResultsGrid, #recentPhotosRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 360px; }
+    #recentPhotosRow { grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); overflow-x: auto; }
+    .photoThumbBtn {
+      aspect-ratio: 1; border-radius: 10px; border: 3px solid #fff; padding: 0; cursor: pointer;
+      background-size: cover; background-position: center; overflow: hidden;
+    }
+    #recentPhotosLabel { font-size: 0.8rem; opacity: 0.85; margin-top: 6px; }
+
+    #menuProjectList { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 360px; }
+    .menuProjectRow {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.1); border-radius: 12px; padding: 6px;
+      border: 2px solid transparent;
+    }
+    .menuProjectRow.active { border-color: #ffd76b; }
+    .menuProjectThumb {
+      width: 46px; height: 34px; border-radius: 6px; flex-shrink: 0; cursor: pointer;
+      background-size: cover; background-position: center; overflow: hidden; position: relative;
+    }
+    .menuProjectThumb img { width: 100%; height: 100%; object-fit: cover; }
+    .menuProjectName { flex: 1; text-align: left; font-weight: bold; font-size: 0.9rem; cursor: pointer; }
+    .menuDeleteBtn { background: none; border: none; color: #ffb0b0; font-size: 1.1rem; cursor: pointer; padding: 4px; }
+
+    #projectNameInput {
+      font-family: inherit; font-size: 1.1rem; font-weight: bold; text-align: center;
+      padding: 10px; border-radius: 12px; border: 3px solid #fff; width: 90%; max-width: 300px;
+      background: rgba(255,255,255,0.95); color: #2a1a3e;
+    }
 
     #drawSurfaceWrap { width: 100%; max-width: 360px; aspect-ratio: 4/3; border: 4px solid #fff; border-radius: 12px; overflow: hidden; }
     #drawSurface { width: 100%; height: 100%; display: block; touch-action: none; }
@@ -123,18 +175,58 @@
   <p class="sub">Pick or draw a background, add text, then play your slideshow!</p>
 
   <div id="appWrap">
+    <div id="topBar">
+      <button class="btn" id="menuBtn">☰ Menu</button>
+      <span id="projectNameLabel"></span>
+    </div>
     <div id="slideStageWrap">
+      <button class="btn" id="bgTypeBtn">🖼️ Background</button>
       <div id="slideCanvas"></div>
     </div>
     <div id="toolRow">
-      <button class="btn" id="pickBgBtn">🎨 Background</button>
-      <button class="btn" id="drawBgBtn">✏️ Draw</button>
       <button class="btn" id="addTextBtn">🔤 Add Text</button>
       <button class="btn" id="transitionBtn">🎞️ Fade</button>
       <button class="btn danger" id="deleteSlideBtn">🗑️ Delete Slide</button>
     </div>
     <div id="slideFilmstrip"></div>
     <button class="btn wide" id="playBtn">▶️ Play Slideshow</button>
+  </div>
+
+  <div id="bgTypeOverlay">
+    <div style="font-weight:bold;">🖼️ Pick a Background</div>
+    <button class="btn" id="bgTypeColorsBtn">🎨 Colors &amp; Gradients</button>
+    <button class="btn" id="bgTypeDrawBtn">✏️ Draw It Myself</button>
+    <button class="btn" id="bgTypePhotoBtn">🌐 Search a Photo</button>
+    <button class="btn" id="bgTypeCloseBtn">✖ Close</button>
+  </div>
+
+  <div id="menuOverlay">
+    <div style="font-weight:bold;">☰ My Slideshows</div>
+    <div id="menuProjectList"></div>
+    <button class="btn" id="menuNewProjectBtn">➕ New Slideshow</button>
+    <button class="btn" id="menuCloseBtn">✖ Close</button>
+  </div>
+
+  <div id="projectNameOverlay">
+    <div style="font-weight:bold;" id="projectNameOverlayTitle">Name Your Slideshow</div>
+    <input type="text" id="projectNameInput" maxlength="30" placeholder="My Slideshow">
+    <div>
+      <button class="btn" id="projectNameCancelBtn">✖ Cancel</button>
+      <button class="btn" id="projectNameSaveBtn">✅ Save</button>
+    </div>
+  </div>
+
+  <div id="photoSearchOverlay">
+    <div style="font-weight:bold;">🌐 Search a Photo</div>
+    <div id="photoSearchRow">
+      <input type="text" id="photoSearchInput" maxlength="40" placeholder="Try: puppy, ocean, rainbow...">
+      <button class="btn" id="photoSearchGoBtn">🔍</button>
+    </div>
+    <div id="photoSearchStatus"></div>
+    <div id="photoResultsGrid"></div>
+    <div id="recentPhotosLabel">🕒 Recently Used</div>
+    <div id="recentPhotosRow"></div>
+    <button class="btn" id="photoSearchCloseBtn">✖ Close</button>
   </div>
 
   <div id="bgPickerOverlay">
@@ -199,11 +291,20 @@
     var PLAYER_ADVANCE_MS = 4000;
     var PLAYER_TRANSITION_MS = 600;
 
+    var PROJECTS_STORAGE_KEY = "slideStudioProjects";
+    var RECENT_PHOTOS_STORAGE_KEY = "slideStudioRecentPhotos";
+    var MAX_RECENT_PHOTOS = 10;
+
     var slides = [];
     var slideIdCounter = 0;
     var textIdCounter = 0;
     var currentSlideIndex = 0;
     var editingTextId = null;
+
+    var projects = [];
+    var projectIdCounter = 0;
+    var currentProjectId = null;
+    var recentPhotos = [];
 
     function removeById(arr, id) {
       for (var i = 0; i < arr.length; i++) {
@@ -219,22 +320,164 @@
       slideIdCounter++;
       return { id: "s" + slideIdCounter, background: { type: "color", value: BACKGROUND_PRESETS[0].css }, texts: [], transition: "fade" };
     }
-    function initSlides() {
-      slides = [makeSlide()];
-      currentSlideIndex = 0;
-    }
     function currentSlide() { return slides[currentSlideIndex]; }
 
     function addSlide() {
       slides.push(makeSlide());
       currentSlideIndex = slides.length - 1;
       renderAll();
+      persistProject();
     }
     function deleteCurrentSlide() {
       if (slides.length <= 1) return;
       slides.splice(currentSlideIndex, 1);
       currentSlideIndex = Math.max(0, currentSlideIndex - 1);
       renderAll();
+      persistProject();
+    }
+
+    // ---------------- projects (saved slideshows) ----------------
+    function makeProject(name) {
+      projectIdCounter++;
+      return { id: "p" + projectIdCounter + "_" + Date.now(), name: name || "My Slideshow", slides: [makeSlide()], updatedAt: Date.now() };
+    }
+    function loadProjectsFromStorage() {
+      try {
+        var raw = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
+        projects = raw ? JSON.parse(raw) : [];
+      } catch (e) { projects = []; }
+      if (!Array.isArray(projects)) projects = [];
+      var maxId = 0;
+      projects.forEach(function (p) {
+        (p.slides || []).forEach(function (s) {
+          var n = parseInt(String(s.id).replace("s", ""), 10);
+          if (!isNaN(n) && n > maxId) maxId = n;
+        });
+      });
+      slideIdCounter = maxId;
+    }
+    function saveProjectsToStorage() {
+      try { window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects)); } catch (e) {}
+    }
+    function persistProject() {
+      if (!currentProjectId) return;
+      var proj = findById(projects, currentProjectId);
+      if (!proj) return;
+      proj.slides = slides;
+      proj.updatedAt = Date.now();
+      saveProjectsToStorage();
+    }
+    function loadProject(id) {
+      var proj = findById(projects, id);
+      if (!proj) return;
+      currentProjectId = id;
+      slides = proj.slides;
+      currentSlideIndex = 0;
+      document.getElementById("projectNameLabel").textContent = proj.name;
+      renderAll();
+    }
+    function createNewProject(name) {
+      var proj = makeProject(name);
+      projects.push(proj);
+      saveProjectsToStorage();
+      loadProject(proj.id);
+    }
+    function renameProject(id, name) {
+      var proj = findById(projects, id);
+      if (!proj || !name || !name.trim()) return;
+      proj.name = name.trim();
+      saveProjectsToStorage();
+      if (id === currentProjectId) document.getElementById("projectNameLabel").textContent = proj.name;
+    }
+    function deleteProject(id) {
+      if (projects.length <= 1) return;
+      var wasCurrent = id === currentProjectId;
+      removeById(projects, id);
+      saveProjectsToStorage();
+      if (wasCurrent) loadProject(projects[0].id);
+      renderMenuProjectList();
+    }
+
+    // ---------------- menu overlay (all saved slideshows) ----------------
+    function openMenu() {
+      renderMenuProjectList();
+      document.getElementById("menuOverlay").style.display = "flex";
+    }
+    function closeMenu() { document.getElementById("menuOverlay").style.display = "none"; }
+    function renderMenuProjectList() {
+      var list = document.getElementById("menuProjectList");
+      list.innerHTML = "";
+      projects.forEach(function (p) {
+        var row = document.createElement("div");
+        row.className = "menuProjectRow" + (p.id === currentProjectId ? " active" : "");
+        var thumb = document.createElement("div");
+        thumb.className = "menuProjectThumb";
+        var firstSlide = p.slides[0];
+        if (firstSlide) {
+          if (firstSlide.background.type === "draw" || firstSlide.background.type === "photo") {
+            var img = document.createElement("img");
+            img.src = firstSlide.background.value;
+            thumb.appendChild(img);
+          } else {
+            thumb.style.background = firstSlide.background.value;
+          }
+        }
+        thumb.addEventListener("click", function () { closeMenu(); loadProject(p.id); });
+        row.appendChild(thumb);
+        var label = document.createElement("span");
+        label.className = "menuProjectName";
+        label.textContent = p.name + " (" + p.slides.length + ")";
+        label.addEventListener("click", function () { closeMenu(); loadProject(p.id); });
+        row.appendChild(label);
+        var del = document.createElement("button");
+        del.className = "menuDeleteBtn";
+        del.textContent = "🗑️";
+        del.disabled = projects.length <= 1;
+        del.addEventListener("click", function (e) { e.stopPropagation(); deleteProject(p.id); });
+        row.appendChild(del);
+        list.appendChild(row);
+      });
+    }
+
+    // ---------------- project name overlay (used for both "new" and "rename") ----------------
+    var projectNameOverlayMode = "new";
+    function openNewProjectOverlay() {
+      projectNameOverlayMode = "new";
+      document.getElementById("projectNameOverlayTitle").textContent = "Name Your Slideshow";
+      document.getElementById("projectNameInput").value = "";
+      document.getElementById("projectNameOverlay").style.display = "flex";
+    }
+    function openRenameProjectOverlay() {
+      projectNameOverlayMode = "rename";
+      document.getElementById("projectNameOverlayTitle").textContent = "Rename Slideshow";
+      document.getElementById("projectNameInput").value = findById(projects, currentProjectId).name;
+      document.getElementById("projectNameOverlay").style.display = "flex";
+    }
+    function closeProjectNameOverlay() { document.getElementById("projectNameOverlay").style.display = "none"; }
+    function saveProjectNameOverlay() {
+      var name = document.getElementById("projectNameInput").value.trim();
+      if (!name) return;
+      if (projectNameOverlayMode === "new") createNewProject(name);
+      else renameProject(currentProjectId, name);
+      closeProjectNameOverlay();
+    }
+
+    // ---------------- recently used photos ----------------
+    function loadRecentPhotosFromStorage() {
+      try {
+        var raw = window.localStorage.getItem(RECENT_PHOTOS_STORAGE_KEY);
+        recentPhotos = raw ? JSON.parse(raw) : [];
+      } catch (e) { recentPhotos = []; }
+      if (!Array.isArray(recentPhotos)) recentPhotos = [];
+    }
+    function saveRecentPhotosToStorage() {
+      try { window.localStorage.setItem(RECENT_PHOTOS_STORAGE_KEY, JSON.stringify(recentPhotos)); } catch (e) {}
+    }
+    function addRecentPhoto(photo) {
+      recentPhotos = recentPhotos.filter(function (p) { return p.url !== photo.url; });
+      recentPhotos.unshift(photo);
+      if (recentPhotos.length > MAX_RECENT_PHOTOS) recentPhotos.length = MAX_RECENT_PHOTOS;
+      saveRecentPhotosToStorage();
     }
     function selectSlide(idx) {
       if (idx < 0 || idx >= slides.length) return;
@@ -260,7 +503,7 @@
     // ---------------- rendering ----------------
     function renderSlideInto(container, slide, interactive) {
       container.innerHTML = "";
-      if (slide.background.type === "draw") {
+      if (slide.background.type === "draw" || slide.background.type === "photo") {
         var img = document.createElement("img");
         img.className = "slideBgImg";
         img.src = slide.background.value;
@@ -302,6 +545,7 @@
       el.addEventListener("pointerup", function () {
         dragging = false;
         if (!moved) openTextEditor(textObj.id);
+        else persistProject();
       });
     }
 
@@ -316,7 +560,7 @@
       slides.forEach(function (s, idx) {
         var thumb = document.createElement("button");
         thumb.className = "slideThumb" + (idx === currentSlideIndex ? " active" : "");
-        if (s.background.type === "draw") {
+        if (s.background.type === "draw" || s.background.type === "photo") {
           var img = document.createElement("img");
           img.src = s.background.value;
           thumb.appendChild(img);
@@ -347,6 +591,21 @@
       renderFilmstrip();
     }
 
+    // ---------------- hover-to-preview ----------------
+    function previewSlideBackground(bgSpec) {
+      var temp = { background: bgSpec, texts: currentSlide().texts };
+      renderSlideInto(document.getElementById("slideCanvas"), temp, false);
+    }
+    function cancelPreview() { renderEditorSlide(); }
+    function addHoverPreview(el, bgSpec) {
+      el.addEventListener("mouseenter", function () { previewSlideBackground(bgSpec); });
+      el.addEventListener("mouseleave", function () { cancelPreview(); });
+    }
+
+    // ---------------- background type menu ----------------
+    function openBgTypeMenu() { document.getElementById("bgTypeOverlay").style.display = "flex"; }
+    function closeBgTypeMenu() { document.getElementById("bgTypeOverlay").style.display = "none"; }
+
     // ---------------- background picker ----------------
     function openBgPicker() {
       var grid = document.getElementById("bgPickerGrid");
@@ -355,10 +614,13 @@
         var sw = document.createElement("button");
         sw.className = "bgSwatch";
         sw.style.background = p.css;
+        var bgSpec = { type: "color", value: p.css };
+        addHoverPreview(sw, bgSpec);
         sw.addEventListener("click", function () {
-          currentSlide().background = { type: "color", value: p.css };
+          currentSlide().background = bgSpec;
           closeBgPicker();
           renderAll();
+          persistProject();
         });
         grid.appendChild(sw);
       });
@@ -429,8 +691,67 @@
       currentSlide().background = { type: "draw", value: dataUrl };
       closeDrawMode();
       renderAll();
+      persistProject();
     }
     function closeDrawMode() { document.getElementById("drawOverlay").style.display = "none"; }
+
+    // ---------------- photo search (Openverse - free, keyless, openly-licensed photos) ----------------
+    function openPhotoSearch() {
+      document.getElementById("photoSearchInput").value = "";
+      document.getElementById("photoSearchStatus").textContent = "";
+      document.getElementById("photoResultsGrid").innerHTML = "";
+      renderRecentPhotosRow();
+      document.getElementById("photoSearchOverlay").style.display = "flex";
+    }
+    function closePhotoSearch() { document.getElementById("photoSearchOverlay").style.display = "none"; }
+
+    function makePhotoThumbButton(photo) {
+      var btn = document.createElement("button");
+      btn.className = "photoThumbBtn";
+      btn.style.backgroundImage = "url('" + photo.thumbnail + "')";
+      var bgSpec = { type: "photo", value: photo.url };
+      addHoverPreview(btn, bgSpec);
+      btn.addEventListener("click", function () {
+        currentSlide().background = bgSpec;
+        addRecentPhoto(photo);
+        closePhotoSearch();
+        renderAll();
+        persistProject();
+      });
+      return btn;
+    }
+    function renderPhotoResults(photos) {
+      var grid = document.getElementById("photoResultsGrid");
+      grid.innerHTML = "";
+      photos.forEach(function (photo) { grid.appendChild(makePhotoThumbButton(photo)); });
+    }
+    function renderRecentPhotosRow() {
+      var row = document.getElementById("recentPhotosRow");
+      row.innerHTML = "";
+      recentPhotos.forEach(function (photo) { row.appendChild(makePhotoThumbButton(photo)); });
+      document.getElementById("recentPhotosLabel").style.display = recentPhotos.length ? "block" : "none";
+    }
+    function searchPhotos() {
+      var query = document.getElementById("photoSearchInput").value.trim();
+      if (!query) return;
+      var statusEl = document.getElementById("photoSearchStatus");
+      document.getElementById("photoResultsGrid").innerHTML = "";
+      statusEl.textContent = "🔎 Searching...";
+      fetch("https://api.openverse.org/v1/images/?q=" + encodeURIComponent(query) + "&page_size=12")
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          var results = (data.results || []).filter(function (r) { return !r.mature && r.url && r.thumbnail; });
+          if (!results.length) {
+            statusEl.textContent = "😅 No photos found. Try another word!";
+            return;
+          }
+          statusEl.textContent = "";
+          renderPhotoResults(results.map(function (r) { return { url: r.url, thumbnail: r.thumbnail }; }));
+        })
+        .catch(function () {
+          statusEl.textContent = "⚠️ Couldn't reach the photo search. Try again!";
+        });
+    }
 
     // ---------------- text editor overlay ----------------
     function openTextEditor(id) {
@@ -449,7 +770,7 @@
         var sw = document.createElement("button");
         sw.className = "colorSwatch" + (c === t.color ? " selected" : "");
         sw.style.background = c;
-        sw.addEventListener("click", function () { t.color = c; renderTextColorRow(t); renderEditorSlide(); });
+        sw.addEventListener("click", function () { t.color = c; renderTextColorRow(t); renderEditorSlide(); persistProject(); });
         row.appendChild(sw);
       });
     }
@@ -461,7 +782,7 @@
         b.className = "sizeBtn" + (key === t.size ? " selected" : "");
         b.textContent = key === "small" ? "A" : key === "medium" ? "A" : "A";
         b.style.fontSize = key === "small" ? "0.8rem" : key === "medium" ? "1.1rem" : "1.5rem";
-        b.addEventListener("click", function () { t.size = key; renderTextSizeRow(t); renderEditorSlide(); });
+        b.addEventListener("click", function () { t.size = key; renderTextSizeRow(t); renderEditorSlide(); persistProject(); });
         row.appendChild(b);
       });
     }
@@ -470,11 +791,13 @@
       if (t) t.content = document.getElementById("textEditInput").value.trim() || "Type here!";
       closeTextEditor();
       renderAll();
+      persistProject();
     }
     function deleteEditingText() {
       removeById(currentSlide().texts, editingTextId);
       closeTextEditor();
       renderAll();
+      persistProject();
     }
     function closeTextEditor() {
       document.getElementById("textEditOverlay").style.display = "none";
@@ -487,6 +810,7 @@
       var idx = TRANSITIONS.indexOf(s.transition);
       s.transition = TRANSITIONS[(idx + 1) % TRANSITIONS.length];
       document.getElementById("transitionBtn").textContent = "🎞️ " + TRANSITION_LABELS[s.transition];
+      persistProject();
     }
 
     // ---------------- slideshow player ----------------
@@ -532,9 +856,12 @@
     }
 
     // ---------------- init / wiring ----------------
-    document.getElementById("pickBgBtn").addEventListener("click", openBgPicker);
+    document.getElementById("bgTypeBtn").addEventListener("click", openBgTypeMenu);
+    document.getElementById("bgTypeCloseBtn").addEventListener("click", closeBgTypeMenu);
+    document.getElementById("bgTypeColorsBtn").addEventListener("click", function () { closeBgTypeMenu(); openBgPicker(); });
+    document.getElementById("bgTypeDrawBtn").addEventListener("click", function () { closeBgTypeMenu(); openDrawMode(); });
+    document.getElementById("bgTypePhotoBtn").addEventListener("click", function () { closeBgTypeMenu(); openPhotoSearch(); });
     document.getElementById("bgPickerCloseBtn").addEventListener("click", closeBgPicker);
-    document.getElementById("drawBgBtn").addEventListener("click", openDrawMode);
     document.getElementById("drawCancelBtn").addEventListener("click", closeDrawMode);
     document.getElementById("drawClearBtn").addEventListener("click", clearDrawing);
     document.getElementById("drawDoneBtn").addEventListener("click", saveDrawing);
@@ -547,6 +874,19 @@
     document.getElementById("exitPlayBtn").addEventListener("click", function (e) { e.stopPropagation(); exitSlideshow(); });
     document.getElementById("playerScreen").addEventListener("click", function () {
       advanceSlideshow();
+    });
+
+    document.getElementById("menuBtn").addEventListener("click", openMenu);
+    document.getElementById("menuCloseBtn").addEventListener("click", closeMenu);
+    document.getElementById("menuNewProjectBtn").addEventListener("click", function () { closeMenu(); openNewProjectOverlay(); });
+    document.getElementById("projectNameLabel").addEventListener("click", openRenameProjectOverlay);
+    document.getElementById("projectNameCancelBtn").addEventListener("click", closeProjectNameOverlay);
+    document.getElementById("projectNameSaveBtn").addEventListener("click", saveProjectNameOverlay);
+
+    document.getElementById("photoSearchCloseBtn").addEventListener("click", closePhotoSearch);
+    document.getElementById("photoSearchGoBtn").addEventListener("click", searchPhotos);
+    document.getElementById("photoSearchInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); searchPhotos(); }
     });
 
     (function () {
@@ -573,8 +913,13 @@
       canvas.addEventListener("pointerleave", function () { isDrawing = false; });
     })();
 
-    initSlides();
-    renderAll();
+    loadProjectsFromStorage();
+    loadRecentPhotosFromStorage();
+    if (!projects.length) {
+      projects.push(makeProject("My First Slideshow"));
+      saveProjectsToStorage();
+    }
+    loadProject(projects[0].id);
   </script>
 </body>
 </html>
