@@ -935,6 +935,23 @@
     // there's no specificity cascade to get wrong: set the pre-animation "start" state, force a
     // reflow to commit it, then set the "end" state with a transition duration attached.
     function applyStandardTransition(transitionType, incomingEl, outgoingEl) {
+      if (transitionType === "none") {
+        // A true hard cut: skip the shared "start state -> forced reflow -> animated end state"
+        // dance entirely (used by fade/slide/zoom below) so there's never a live opacity flip a
+        // browser could paint as an intermediate frame — just one atomic class swap. Clearing the
+        // inline opacity (instead of setting it to an explicit 0/1) also means nothing is left
+        // behind to interfere with a dissolve transition on a later slide.
+        [incomingEl, outgoingEl].forEach(function (el) {
+          el.style.transition = "none";
+          el.style.transform = "none";
+          el.style.opacity = "";
+          el.style.zIndex = "";
+        });
+        incomingEl.className = "playerSlide active";
+        outgoingEl.className = "playerSlide";
+        return;
+      }
+
       [incomingEl, outgoingEl].forEach(function (el) {
         el.className = "playerSlide";
         el.style.transition = "none";
@@ -954,13 +971,6 @@
       }
 
       if (incomingEl.offsetWidth) { /* force reflow: commit the start state above before animating to the end state */ }
-
-      if (transitionType === "none") {
-        incomingEl.style.opacity = "1";
-        outgoingEl.style.opacity = "0";
-        finishStandardTransition(incomingEl, outgoingEl);
-        return;
-      }
 
       var durStyle = (PLAYER_TRANSITION_MS / 1000) + "s ease";
       incomingEl.style.transition = "opacity " + durStyle + ", transform " + durStyle;
