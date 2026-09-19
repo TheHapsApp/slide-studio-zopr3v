@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Slide Studio!</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+    body {
+      font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      text-align: center;
+      background: linear-gradient(120deg, #7a2cff, #ff5fa2, #ffd76b);
+      background-size: 300% 300%;
+      animation: flow 14s ease infinite;
+      padding: 16px 12px 40px;
+    }
+    @keyframes flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    h1 { font-size: clamp(1.5rem, 6vw, 2.2rem); text-shadow: 3px 3px 0 rgba(0,0,0,0.3); }
+    .sub { font-size: clamp(0.8rem, 3vw, 1rem); margin: 4px 0 12px; opacity: 0.9; }
+
+    .btn {
+      font-family: inherit; font-weight: bold; font-size: 0.95rem; color: #4a1e6e;
+      background: #ffd76b; border: 3px solid #fff; border-radius: 18px;
+      padding: 9px 16px; margin: 4px; cursor: pointer;
+      box-shadow: 0 5px 0 rgba(0,0,0,0.3);
+    }
+    .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn.wide { display: block; width: 100%; max-width: 400px; margin: 10px auto 0; font-size: 1.1rem; }
+    .btn.danger { background: #ff8080; }
+
+    #appWrap { max-width: 420px; margin: 0 auto; }
+
+    #slideStageWrap {
+      width: 100%; aspect-ratio: 4 / 3; position: relative;
+      border: 5px solid #fff; border-radius: 16px; overflow: hidden;
+      background: #333; margin-bottom: 8px;
+    }
+    #slideCanvas, .slideBgImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .textBoxEl {
+      position: absolute; transform: translate(-50%, -50%);
+      font-family: inherit; font-weight: bold; white-space: pre-wrap; text-align: center;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.35);
+      cursor: grab; padding: 2px 6px; max-width: 90%;
+    }
+
+    #toolRow { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-bottom: 8px; }
+    #toolRow .btn { font-size: 0.82rem; padding: 8px 10px; }
+
+    #slideFilmstrip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 10px; }
+    .slideThumb {
+      flex-shrink: 0; width: 56px; height: 42px; border-radius: 8px;
+      border: 3px solid rgba(255,255,255,0.5); position: relative; cursor: pointer;
+      background-size: cover; background-position: center; overflow: hidden; padding: 0;
+    }
+    .slideThumb.active { border-color: #fff; box-shadow: 0 0 0 2px #ffd76b; }
+    .slideThumb img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+    .thumbNum {
+      position: absolute; bottom: 1px; left: 3px; font-size: 0.6rem; font-weight: bold;
+      text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
+    }
+    .thumbBadge { position: absolute; top: 1px; right: 2px; font-size: 0.55rem; text-shadow: 1px 1px 0 rgba(0,0,0,0.6); }
+    .slideThumb.addThumb {
+      display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* ---- overlays ---- */
+    #bgPickerOverlay, #drawOverlay, #textEditOverlay {
+      display: none; position: fixed; inset: 0; z-index: 50;
+      align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+      background: rgba(20, 10, 30, 0.92); padding: 16px;
+    }
+    #bgPickerGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 340px; }
+    .bgSwatch { height: 52px; border-radius: 10px; border: 3px solid #fff; cursor: pointer; padding: 0; }
+
+    #drawSurfaceWrap { width: 100%; max-width: 360px; aspect-ratio: 4/3; border: 4px solid #fff; border-radius: 12px; overflow: hidden; }
+    #drawSurface { width: 100%; height: 100%; display: block; touch-action: none; }
+    .colorRow { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .colorSwatch { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.5); cursor: pointer; padding: 0; }
+    .colorSwatch.selected { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 0 2px #ffd76b; }
+    .sizeRow { display: flex; gap: 8px; }
+    .sizeBtn { font-family: inherit; font-weight: bold; color: #fff; background: rgba(255,255,255,0.15); border: 3px solid #fff; border-radius: 12px; padding: 6px 12px; cursor: pointer; }
+    .sizeBtn.selected { background: rgba(255,215,107,0.5); }
+
+    #textEditInput {
+      font-family: inherit; font-size: 1.1rem; font-weight: bold; text-align: center;
+      padding: 10px; border-radius: 12px; border: 3px solid #fff; width: 90%; max-width: 320px;
+      background: rgba(255,255,255,0.95); color: #2a1a3e;
+    }
+
+    /* ---- player ---- */
+    #playerScreen {
+      display: none; position: fixed; inset: 0; z-index: 100; background: #000; overflow: hidden;
+    }
+    .playerSlide { position: absolute; inset: 0; opacity: 0; z-index: 1; }
+    .playerSlide.active { opacity: 1; z-index: 2; }
+    .playerSlide .textBoxEl { cursor: default; }
+    .trans-fade.incoming { transition: opacity 0.6s ease; }
+    .trans-slide.incoming { transform: translateX(100%); opacity: 1; transition: transform 0.6s ease; }
+    .trans-slide.incoming.active { transform: translateX(0); }
+    .trans-slide.outgoing.gone { transform: translateX(-100%); transition: transform 0.6s ease; opacity: 1; }
+    .trans-zoom.incoming { transform: scale(0.4); opacity: 0; transition: transform 0.6s ease, opacity 0.6s ease; }
+    .trans-zoom.incoming.active { transform: scale(1); opacity: 1; }
+    .trans-none.incoming { transition: none; }
+    #exitPlayBtn {
+      position: fixed; top: 14px; right: 14px; z-index: 10;
+      background: rgba(255,255,255,0.2); color: #fff; border: 3px solid #fff; border-radius: 50%;
+      width: 40px; height: 40px; font-size: 1.1rem; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎬 Slide Studio</h1>
+  <p class="sub">Pick or draw a background, add text, then play your slideshow!</p>
+
+  <div id="appWrap">
+    <div id="slideStageWrap">
+      <div id="slideCanvas"></div>
+    </div>
+    <div id="toolRow">
+      <button class="btn" id="pickBgBtn">🎨 Background</button>
+      <button class="btn" id="drawBgBtn">✏️ Draw</button>
+      <button class="btn" id="addTextBtn">🔤 Add Text</button>
+      <button class="btn" id="transitionBtn">🎞️ Fade</button>
+      <button class="btn danger" id="deleteSlideBtn">🗑️ Delete Slide</button>
+    </div>
+    <div id="slideFilmstrip"></div>
+    <button class="btn wide" id="playBtn">▶️ Play Slideshow</button>
+  </div>
+
+  <div id="bgPickerOverlay">
+    <div style="font-weight:bold;">🎨 Pick a Background</div>
+    <div id="bgPickerGrid"></div>
+    <button class="btn" id="bgPickerCloseBtn">✖ Close</button>
+  </div>
+
+  <div id="drawOverlay">
+    <div style="font-weight:bold;">✏️ Draw Your Background</div>
+    <div id="drawSurfaceWrap"><canvas id="drawSurface"></canvas></div>
+    <div class="colorRow" id="drawColorRow"></div>
+    <div class="sizeRow" id="drawSizeRow"></div>
+    <div>
+      <button class="btn" id="drawClearBtn">🧹 Clear</button>
+      <button class="btn" id="drawCancelBtn">✖ Cancel</button>
+      <button class="btn" id="drawDoneBtn">✅ Done</button>
+    </div>
+  </div>
+
+  <div id="textEditOverlay">
+    <div style="font-weight:bold;">🔤 Edit Text</div>
+    <input type="text" id="textEditInput" maxlength="60" placeholder="Type here!">
+    <div class="colorRow" id="textColorRow"></div>
+    <div class="sizeRow" id="textSizeRow"></div>
+    <div>
+      <button class="btn danger" id="textDeleteBtn">🗑️ Delete</button>
+      <button class="btn" id="textDoneBtn">✅ Done</button>
+    </div>
+  </div>
+
+  <div id="playerScreen">
+    <button id="exitPlayBtn">✖</button>
+    <div class="playerSlide" id="playerStageA"></div>
+    <div class="playerSlide" id="playerStageB"></div>
+  </div>
+
+  <script>
+    var BACKGROUND_PRESETS = [
+      { id: "sky", css: "linear-gradient(180deg,#6ec6ff,#ffffff)" },
+      { id: "sunset", css: "linear-gradient(180deg,#ff7e5f,#feb47b)" },
+      { id: "forest", css: "linear-gradient(180deg,#2e7d32,#a5d6a7)" },
+      { id: "night", css: "linear-gradient(180deg,#0d1b3e,#3949ab)" },
+      { id: "candy", css: "linear-gradient(135deg,#ff9a9e,#fecfef)" },
+      { id: "ocean", css: "linear-gradient(180deg,#0077be,#90e0ef)" },
+      { id: "sand", css: "linear-gradient(180deg,#e8c98a,#f5deb3)" },
+      { id: "space", css: "linear-gradient(180deg,#0b1d4d,#4b2e83)" },
+      { id: "red", css: "#ff5f5f" },
+      { id: "yellow", css: "#ffd76b" },
+      { id: "green", css: "#5fd97a" },
+      { id: "purple", css: "#b26bff" },
+      { id: "white", css: "#ffffff" },
+      { id: "black", css: "#222222" }
+    ];
+    var TEXT_COLORS = ["#ffffff", "#000000", "#ff5f5f", "#ffd76b", "#5fd97a", "#3fd0ff", "#b26bff", "#ff8fd6"];
+    var TEXT_SIZES = { small: 18, medium: 28, large: 42 };
+    var TEXT_SIZE_ORDER = ["small", "medium", "large"];
+    var BRUSH_SIZES = { thin: 3, medium: 8, thick: 16 };
+    var BRUSH_SIZE_ORDER = ["thin", "medium", "thick"];
+    var TRANSITIONS = ["none", "fade", "slide", "zoom"];
+    var TRANSITION_LABELS = { none: "✋ None", fade: "🌫️ Fade", slide: "➡️ Slide", zoom: "🔍 Zoom" };
+    var PLAYER_ADVANCE_MS = 4000;
+    var PLAYER_TRANSITION_MS = 600;
+
+    var slides = [];
+    var slideIdCounter = 0;
+    var textIdCounter = 0;
+    var currentSlideIndex = 0;
+    var editingTextId = null;
+
+    function removeById(arr, id) {
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].id === id) { arr.splice(i, 1); return; }
+      }
+    }
+    function findById(arr, id) {
+      for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i];
+      return null;
+    }
+
+    function makeSlide() {
+      slideIdCounter++;
+      return { id: "s" + slideIdCounter, background: { type: "color", value: BACKGROUND_PRESETS[0].css }, texts: [], transition: "fade" };
+    }
+    function initSlides() {
+      slides = [makeSlide()];
+      currentSlideIndex = 0;
+    }
+    function currentSlide() { return slides[currentSlideIndex]; }
+
+    function addSlide() {
+      slides.push(makeSlide());
+      currentSlideIndex = slides.length - 1;
+      renderAll();
+    }
+    function deleteCurrentSlide() {
+      if (slides.length <= 1) return;
+      slides.splice(currentSlideIndex, 1);
+      currentSlideIndex = Math.max(0, currentSlideIndex - 1);
+      renderAll();
+    }
+    function selectSlide(idx) {
+      if (idx < 0 || idx >= slides.length) return;
+      currentSlideIndex = idx;
+      renderAll();
+    }
+
+    // ---------------- text boxes ----------------
+    function addTextBox() {
+      textIdCounter++;
+      var t = { id: "t" + textIdCounter, content: "Type here!", x: 50, y: 50, color: "#ffffff", size: "medium" };
+      currentSlide().texts.push(t);
+      renderEditorSlide();
+      openTextEditor(t.id);
+    }
+    function updateTextPosition(id, x, y) {
+      var t = findById(currentSlide().texts, id);
+      if (!t) return;
+      t.x = Math.max(5, Math.min(95, x));
+      t.y = Math.max(5, Math.min(95, y));
+    }
+
+    // ---------------- rendering ----------------
+    function renderSlideInto(container, slide, interactive) {
+      container.innerHTML = "";
+      if (slide.background.type === "draw") {
+        var img = document.createElement("img");
+        img.className = "slideBgImg";
+        img.src = slide.background.value;
+        container.appendChild(img);
+        container.style.background = "";
+      } else {
+        container.style.background = slide.background.value;
+      }
+      slide.texts.forEach(function (t) {
+        var box = document.createElement("div");
+        box.className = "textBoxEl";
+        box.textContent = t.content;
+        box.style.left = t.x + "%";
+        box.style.top = t.y + "%";
+        box.style.color = t.color;
+        box.style.fontSize = TEXT_SIZES[t.size] + "px";
+        container.appendChild(box);
+        if (interactive) makeTextBoxDraggable(box, t, container);
+      });
+    }
+    function makeTextBoxDraggable(el, textObj, stageEl) {
+      var dragging = false, moved = false, startX = 0, startY = 0;
+      el.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        dragging = true; moved = false;
+        startX = e.clientX; startY = e.clientY;
+        if (el.setPointerCapture) el.setPointerCapture(e.pointerId);
+      });
+      el.addEventListener("pointermove", function (e) {
+        if (!dragging) return;
+        if (Math.abs(e.clientX - startX) > 4 || Math.abs(e.clientY - startY) > 4) moved = true;
+        var rect = stageEl.getBoundingClientRect();
+        var xPct = ((e.clientX - rect.left) / rect.width) * 100;
+        var yPct = ((e.clientY - rect.top) / rect.height) * 100;
+        updateTextPosition(textObj.id, xPct, yPct);
+        el.style.left = textObj.x + "%";
+        el.style.top = textObj.y + "%";
+      });
+      el.addEventListener("pointerup", function () {
+        dragging = false;
+        if (!moved) openTextEditor(textObj.id);
+      });
+    }
+
+    function renderEditorSlide() {
+      renderSlideInto(document.getElementById("slideCanvas"), currentSlide(), true);
+      document.getElementById("transitionBtn").textContent = "🎞️ " + TRANSITION_LABELS[currentSlide().transition];
+      document.getElementById("deleteSlideBtn").disabled = slides.length <= 1;
+    }
+    function renderFilmstrip() {
+      var strip = document.getElementById("slideFilmstrip");
+      strip.innerHTML = "";
+      slides.forEach(function (s, idx) {
+        var thumb = document.createElement("button");
+        thumb.className = "slideThumb" + (idx === currentSlideIndex ? " active" : "");
+        if (s.background.type === "draw") {
+          var img = document.createElement("img");
+          img.src = s.background.value;
+          thumb.appendChild(img);
+        } else {
+          thumb.style.background = s.background.value;
+        }
+        if (s.texts.length > 0) {
+          var badge = document.createElement("span");
+          badge.className = "thumbBadge";
+          badge.textContent = "🔤" + s.texts.length;
+          thumb.appendChild(badge);
+        }
+        var num = document.createElement("span");
+        num.className = "thumbNum";
+        num.textContent = idx + 1;
+        thumb.appendChild(num);
+        thumb.addEventListener("click", function () { selectSlide(idx); });
+        strip.appendChild(thumb);
+      });
+      var addBtn = document.createElement("button");
+      addBtn.className = "slideThumb addThumb";
+      addBtn.textContent = "➕";
+      addBtn.addEventListener("click", addSlide);
+      strip.appendChild(addBtn);
+    }
+    function renderAll() {
+      renderEditorSlide();
+      renderFilmstrip();
+    }
+
+    // ---------------- background picker ----------------
+    function openBgPicker() {
+      var grid = document.getElementById("bgPickerGrid");
+      grid.innerHTML = "";
+      BACKGROUND_PRESETS.forEach(function (p) {
+        var sw = document.createElement("button");
+        sw.className = "bgSwatch";
+        sw.style.background = p.css;
+        sw.addEventListener("click", function () {
+          currentSlide().background = { type: "color", value: p.css };
+          closeBgPicker();
+          renderAll();
+        });
+        grid.appendChild(sw);
+      });
+      document.getElementById("bgPickerOverlay").style.display = "flex";
+    }
+    function closeBgPicker() { document.getElementById("bgPickerOverlay").style.display = "none"; }
+
+    // ---------------- draw mode ----------------
+    var drawCtx = null;
+    var drawColor = "#000000";
+    var drawSizeKey = "medium";
+    var isDrawing = false;
+    var lastDrawX = 0, lastDrawY = 0;
+
+    function openDrawMode() {
+      var canvas = document.getElementById("drawSurface");
+      canvas.width = 400; canvas.height = 300;
+      drawCtx = canvas.getContext("2d");
+      drawCtx.lineCap = "round"; drawCtx.lineJoin = "round";
+      var bg = currentSlide().background;
+      if (bg.type === "draw") {
+        var img = new Image();
+        img.onload = function () { drawCtx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+        img.src = bg.value;
+      } else {
+        drawCtx.fillStyle = "#ffffff";
+        drawCtx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      renderDrawColorRow();
+      renderDrawSizeRow();
+      document.getElementById("drawOverlay").style.display = "flex";
+    }
+    function renderDrawColorRow() {
+      var row = document.getElementById("drawColorRow");
+      row.innerHTML = "";
+      TEXT_COLORS.forEach(function (c) {
+        var sw = document.createElement("button");
+        sw.className = "colorSwatch" + (c === drawColor ? " selected" : "");
+        sw.style.background = c;
+        sw.addEventListener("click", function () { drawColor = c; renderDrawColorRow(); });
+        row.appendChild(sw);
+      });
+    }
+    function renderDrawSizeRow() {
+      var row = document.getElementById("drawSizeRow");
+      row.innerHTML = "";
+      BRUSH_SIZE_ORDER.forEach(function (key) {
+        var b = document.createElement("button");
+        b.className = "sizeBtn" + (key === drawSizeKey ? " selected" : "");
+        b.textContent = key === "thin" ? "•" : key === "medium" ? "●" : "⬤";
+        b.addEventListener("click", function () { drawSizeKey = key; renderDrawSizeRow(); });
+        row.appendChild(b);
+      });
+    }
+    function canvasPoint(e, canvas) {
+      var rect = canvas.getBoundingClientRect();
+      var scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+      return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+    }
+    function clearDrawing() {
+      var canvas = document.getElementById("drawSurface");
+      drawCtx.fillStyle = "#ffffff";
+      drawCtx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    function saveDrawing() {
+      var canvas = document.getElementById("drawSurface");
+      var dataUrl = canvas.toDataURL("image/png");
+      currentSlide().background = { type: "draw", value: dataUrl };
+      closeDrawMode();
+      renderAll();
+    }
+    function closeDrawMode() { document.getElementById("drawOverlay").style.display = "none"; }
+
+    // ---------------- text editor overlay ----------------
+    function openTextEditor(id) {
+      editingTextId = id;
+      var t = findById(currentSlide().texts, id);
+      if (!t) return;
+      document.getElementById("textEditInput").value = t.content;
+      renderTextColorRow(t);
+      renderTextSizeRow(t);
+      document.getElementById("textEditOverlay").style.display = "flex";
+    }
+    function renderTextColorRow(t) {
+      var row = document.getElementById("textColorRow");
+      row.innerHTML = "";
+      TEXT_COLORS.forEach(function (c) {
+        var sw = document.createElement("button");
+        sw.className = "colorSwatch" + (c === t.color ? " selected" : "");
+        sw.style.background = c;
+        sw.addEventListener("click", function () { t.color = c; renderTextColorRow(t); renderEditorSlide(); });
+        row.appendChild(sw);
+      });
+    }
+    function renderTextSizeRow(t) {
+      var row = document.getElementById("textSizeRow");
+      row.innerHTML = "";
+      TEXT_SIZE_ORDER.forEach(function (key) {
+        var b = document.createElement("button");
+        b.className = "sizeBtn" + (key === t.size ? " selected" : "");
+        b.textContent = key === "small" ? "A" : key === "medium" ? "A" : "A";
+        b.style.fontSize = key === "small" ? "0.8rem" : key === "medium" ? "1.1rem" : "1.5rem";
+        b.addEventListener("click", function () { t.size = key; renderTextSizeRow(t); renderEditorSlide(); });
+        row.appendChild(b);
+      });
+    }
+    function saveTextEdit() {
+      var t = findById(currentSlide().texts, editingTextId);
+      if (t) t.content = document.getElementById("textEditInput").value.trim() || "Type here!";
+      closeTextEditor();
+      renderAll();
+    }
+    function deleteEditingText() {
+      removeById(currentSlide().texts, editingTextId);
+      closeTextEditor();
+      renderAll();
+    }
+    function closeTextEditor() {
+      document.getElementById("textEditOverlay").style.display = "none";
+      editingTextId = null;
+    }
+
+    // ---------------- transitions ----------------
+    function cycleTransition() {
+      var s = currentSlide();
+      var idx = TRANSITIONS.indexOf(s.transition);
+      s.transition = TRANSITIONS[(idx + 1) % TRANSITIONS.length];
+      document.getElementById("transitionBtn").textContent = "🎞️ " + TRANSITION_LABELS[s.transition];
+    }
+
+    // ---------------- slideshow player ----------------
+    var playerIndex = 0;
+    var playerActiveIsA = true;
+    var playerTimer = null;
+
+    function startSlideshow() {
+      playerIndex = 0;
+      playerActiveIsA = true;
+      var stageA = document.getElementById("playerStageA");
+      var stageB = document.getElementById("playerStageB");
+      renderSlideInto(stageA, slides[0], false);
+      stageA.className = "playerSlide active";
+      stageB.className = "playerSlide";
+      document.getElementById("playerScreen").style.display = "block";
+      schedulePlayerAdvance();
+    }
+    function schedulePlayerAdvance() {
+      if (playerTimer) clearTimeout(playerTimer);
+      playerTimer = setTimeout(advanceSlideshow, PLAYER_ADVANCE_MS);
+    }
+    function advanceSlideshow() {
+      var nextIndex = (playerIndex + 1) % slides.length;
+      var nextSlide = slides[nextIndex];
+      var incomingEl = playerActiveIsA ? document.getElementById("playerStageB") : document.getElementById("playerStageA");
+      var outgoingEl = playerActiveIsA ? document.getElementById("playerStageA") : document.getElementById("playerStageB");
+      renderSlideInto(incomingEl, nextSlide, false);
+      var transitionType = nextSlide.transition;
+      incomingEl.className = "playerSlide incoming trans-" + transitionType;
+      outgoingEl.className = "playerSlide outgoing trans-" + transitionType;
+      if (incomingEl.offsetWidth) { /* force reflow so the transition class change is picked up */ }
+      incomingEl.classList.add("active");
+      outgoingEl.classList.add("gone");
+      setTimeout(function () { outgoingEl.className = "playerSlide"; }, PLAYER_TRANSITION_MS);
+      playerIndex = nextIndex;
+      playerActiveIsA = !playerActiveIsA;
+      schedulePlayerAdvance();
+    }
+    function exitSlideshow() {
+      if (playerTimer) { clearTimeout(playerTimer); playerTimer = null; }
+      document.getElementById("playerScreen").style.display = "none";
+    }
+
+    // ---------------- init / wiring ----------------
+    document.getElementById("pickBgBtn").addEventListener("click", openBgPicker);
+    document.getElementById("bgPickerCloseBtn").addEventListener("click", closeBgPicker);
+    document.getElementById("drawBgBtn").addEventListener("click", openDrawMode);
+    document.getElementById("drawCancelBtn").addEventListener("click", closeDrawMode);
+    document.getElementById("drawClearBtn").addEventListener("click", clearDrawing);
+    document.getElementById("drawDoneBtn").addEventListener("click", saveDrawing);
+    document.getElementById("addTextBtn").addEventListener("click", addTextBox);
+    document.getElementById("transitionBtn").addEventListener("click", cycleTransition);
+    document.getElementById("deleteSlideBtn").addEventListener("click", deleteCurrentSlide);
+    document.getElementById("textDoneBtn").addEventListener("click", saveTextEdit);
+    document.getElementById("textDeleteBtn").addEventListener("click", deleteEditingText);
+    document.getElementById("playBtn").addEventListener("click", startSlideshow);
+    document.getElementById("exitPlayBtn").addEventListener("click", function (e) { e.stopPropagation(); exitSlideshow(); });
+    document.getElementById("playerScreen").addEventListener("click", function () {
+      advanceSlideshow();
+    });
+
+    (function () {
+      var canvas = document.getElementById("drawSurface");
+      canvas.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        isDrawing = true;
+        var p = canvasPoint(e, canvas);
+        lastDrawX = p.x; lastDrawY = p.y;
+        if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+      });
+      canvas.addEventListener("pointermove", function (e) {
+        if (!isDrawing) return;
+        var p = canvasPoint(e, canvas);
+        drawCtx.strokeStyle = drawColor;
+        drawCtx.lineWidth = BRUSH_SIZES[drawSizeKey];
+        drawCtx.beginPath();
+        drawCtx.moveTo(lastDrawX, lastDrawY);
+        drawCtx.lineTo(p.x, p.y);
+        drawCtx.stroke();
+        lastDrawX = p.x; lastDrawY = p.y;
+      });
+      canvas.addEventListener("pointerup", function () { isDrawing = false; });
+      canvas.addEventListener("pointerleave", function () { isDrawing = false; });
+    })();
+
+    initSlides();
+    renderAll();
+  </script>
+</body>
+</html>
