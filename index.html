@@ -153,16 +153,13 @@
     #playerScreen {
       display: none; position: fixed; inset: 0; z-index: 100; background: #000; overflow: hidden;
     }
+    /* Transition animation itself is driven by explicit inline styles set from JS (see
+       applyStandardTransition) rather than CSS classes - two-class selectors like .trans-slide.incoming
+       and .playerSlide.active have identical specificity, which made the wrong one win depending on
+       source order alone. These two rules just define the settled (non-animating) resting state. */
     .playerSlide { position: absolute; inset: 0; opacity: 0; z-index: 1; }
     .playerSlide.active { opacity: 1; z-index: 2; }
     .playerSlide .textBoxEl { cursor: default; }
-    .trans-fade.incoming { transition: opacity 0.6s ease; }
-    .trans-slide.incoming { transform: translateX(100%); opacity: 1; transition: transform 0.6s ease; }
-    .trans-slide.incoming.active { transform: translateX(0); }
-    .trans-slide.outgoing.gone { transform: translateX(-100%); transition: transform 0.6s ease; opacity: 1; }
-    .trans-zoom.incoming { transform: scale(0.4); opacity: 0; transition: transform 0.6s ease, opacity 0.6s ease; }
-    .trans-zoom.incoming.active { transform: scale(1); opacity: 1; }
-    .trans-none.incoming { transition: none; }
     #exitPlayBtn {
       position: fixed; top: 14px; right: 14px; z-index: 10;
       background: rgba(255,255,255,0.2); color: #fff; border: 3px solid #fff; border-radius: 50%;
@@ -893,6 +890,62 @@
       }
       revealNextBatch();
     }
+    // Drives none/fade/slide/zoom entirely through explicit inline styles (not CSS classes), so
+    // there's no specificity cascade to get wrong: set the pre-animation "start" state, force a
+    // reflow to commit it, then set the "end" state with a transition duration attached.
+    function applyStandardTransition(transitionType, incomingEl, outgoingEl) {
+      [incomingEl, outgoingEl].forEach(function (el) {
+        el.className = "playerSlide";
+        el.style.transition = "none";
+        el.style.transform = "none";
+        el.style.opacity = "1";
+      });
+      incomingEl.style.zIndex = "2";
+      outgoingEl.style.zIndex = "1";
+
+      if (transitionType === "fade") {
+        incomingEl.style.opacity = "0";
+      } else if (transitionType === "slide") {
+        incomingEl.style.transform = "translateX(100%)";
+      } else if (transitionType === "zoom") {
+        incomingEl.style.opacity = "0";
+        incomingEl.style.transform = "scale(0.4)";
+      }
+
+      if (incomingEl.offsetWidth) { /* force reflow: commit the start state above before animating to the end state */ }
+
+      if (transitionType === "none") {
+        incomingEl.style.opacity = "1";
+        outgoingEl.style.opacity = "0";
+        finishStandardTransition(incomingEl, outgoingEl);
+        return;
+      }
+
+      var durStyle = (PLAYER_TRANSITION_MS / 1000) + "s ease";
+      incomingEl.style.transition = "opacity " + durStyle + ", transform " + durStyle;
+      outgoingEl.style.transition = "opacity " + durStyle + ", transform " + durStyle;
+      incomingEl.style.opacity = "1";
+      incomingEl.style.transform = "none";
+      if (transitionType === "fade" || transitionType === "zoom") {
+        outgoingEl.style.opacity = "0";
+      } else if (transitionType === "slide") {
+        outgoingEl.style.transform = "translateX(-100%)";
+      }
+
+      setTimeout(function () { finishStandardTransition(incomingEl, outgoingEl); }, PLAYER_TRANSITION_MS);
+    }
+    function finishStandardTransition(incomingEl, outgoingEl) {
+      incomingEl.style.transition = "none";
+      outgoingEl.style.transition = "none";
+      outgoingEl.style.opacity = "0";
+      outgoingEl.style.transform = "none";
+      outgoingEl.style.zIndex = "";
+      incomingEl.style.opacity = "1";
+      incomingEl.style.transform = "none";
+      incomingEl.style.zIndex = "";
+      incomingEl.className = "playerSlide active";
+      outgoingEl.className = "playerSlide";
+    }
     function advanceSlideshow() {
       var nextIndex = (playerIndex + 1) % slides.length;
       var nextSlide = slides[nextIndex];
@@ -912,12 +965,7 @@
           incomingEl.style.zIndex = "";
         });
       } else {
-        incomingEl.className = "playerSlide incoming trans-" + transitionType;
-        outgoingEl.className = "playerSlide outgoing trans-" + transitionType;
-        if (incomingEl.offsetWidth) { /* force reflow so the transition class change is picked up */ }
-        incomingEl.classList.add("active");
-        outgoingEl.classList.add("gone");
-        setTimeout(function () { outgoingEl.className = "playerSlide"; }, PLAYER_TRANSITION_MS);
+        applyStandardTransition(transitionType, incomingEl, outgoingEl);
       }
 
       playerIndex = nextIndex;
