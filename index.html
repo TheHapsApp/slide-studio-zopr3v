@@ -286,10 +286,23 @@
     var TEXT_SIZE_ORDER = ["small", "medium", "large"];
     var BRUSH_SIZES = { thin: 3, medium: 8, thick: 16 };
     var BRUSH_SIZE_ORDER = ["thin", "medium", "thick"];
-    var TRANSITIONS = ["none", "fade", "slide", "zoom"];
-    var TRANSITION_LABELS = { none: "✋ None", fade: "🌫️ Fade", slide: "➡️ Slide", zoom: "🔍 Zoom" };
+    var TRANSITIONS = ["none", "fade", "slide", "zoom", "dissolve"];
+    var TRANSITION_LABELS = { none: "✋ None", fade: "🌫️ Fade", slide: "➡️ Slide", zoom: "🔍 Zoom", dissolve: "🧩 Dissolve" };
     var PLAYER_ADVANCE_MS = 4000;
     var PLAYER_TRANSITION_MS = 600;
+    var DISSOLVE_COLS = 8;
+    var DISSOLVE_ROWS = 6;
+    var DISSOLVE_TOTAL_MS = 900;
+    var DISSOLVE_TICK_MS = 40;
+
+    function shuffle(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
 
     var PROJECTS_STORAGE_KEY = "slideStudioProjects";
     var RECENT_PHOTOS_STORAGE_KEY = "slideStudioRecentPhotos";
@@ -825,13 +838,60 @@
       var stageB = document.getElementById("playerStageB");
       renderSlideInto(stageA, slides[0], false);
       stageA.className = "playerSlide active";
+      stageA.style.zIndex = ""; stageA.style.webkitMaskImage = ""; stageA.style.maskImage = "";
       stageB.className = "playerSlide";
+      stageB.style.zIndex = ""; stageB.style.webkitMaskImage = ""; stageB.style.maskImage = "";
       document.getElementById("playerScreen").style.display = "block";
       schedulePlayerAdvance();
     }
     function schedulePlayerAdvance() {
       if (playerTimer) clearTimeout(playerTimer);
       playerTimer = setTimeout(advanceSlideshow, PLAYER_ADVANCE_MS);
+    }
+    // "Dissolve": random little squares of the outgoing slide reveal the incoming slide underneath,
+    // one by one, until the whole screen has become the next slide. Built with a canvas-generated
+    // black/white mask (white = outgoing tile still showing, black = revealed) applied via CSS
+    // mask-image, so it works on the real DOM (background + text) without needing to redraw text.
+    function runDissolveTransition(outgoingEl, incomingEl, onDone) {
+      var maskCanvas = document.createElement("canvas");
+      maskCanvas.width = 400; maskCanvas.height = 300;
+      var mctx = maskCanvas.getContext("2d");
+      mctx.fillStyle = "#fff";
+      mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+      var tileW = maskCanvas.width / DISSOLVE_COLS;
+      var tileH = maskCanvas.height / DISSOLVE_ROWS;
+      var tiles = [];
+      for (var r = 0; r < DISSOLVE_ROWS; r++) {
+        for (var c = 0; c < DISSOLVE_COLS; c++) tiles.push({ c: c, r: r });
+      }
+      tiles = shuffle(tiles);
+
+      outgoingEl.style.webkitMaskRepeat = "no-repeat";
+      outgoingEl.style.maskRepeat = "no-repeat";
+      outgoingEl.style.webkitMaskSize = "100% 100%";
+      outgoingEl.style.maskSize = "100% 100%";
+
+      var idx = 0;
+      var batchSize = Math.max(1, Math.round(tiles.length / (DISSOLVE_TOTAL_MS / DISSOLVE_TICK_MS)));
+      function revealNextBatch() {
+        for (var i = 0; i < batchSize && idx < tiles.length; i++, idx++) {
+          var t = tiles[idx];
+          mctx.fillStyle = "#000";
+          mctx.fillRect(t.c * tileW, t.r * tileH, tileW, tileH);
+        }
+        var dataUrl = maskCanvas.toDataURL();
+        outgoingEl.style.webkitMaskImage = "url(" + dataUrl + ")";
+        outgoingEl.style.maskImage = "url(" + dataUrl + ")";
+        if (idx < tiles.length) {
+          setTimeout(revealNextBatch, DISSOLVE_TICK_MS);
+        } else {
+          outgoingEl.style.webkitMaskImage = "";
+          outgoingEl.style.maskImage = "";
+          if (onDone) onDone();
+        }
+      }
+      revealNextBatch();
     }
     function advanceSlideshow() {
       var nextIndex = (playerIndex + 1) % slides.length;
@@ -840,12 +900,26 @@
       var outgoingEl = playerActiveIsA ? document.getElementById("playerStageA") : document.getElementById("playerStageB");
       renderSlideInto(incomingEl, nextSlide, false);
       var transitionType = nextSlide.transition;
-      incomingEl.className = "playerSlide incoming trans-" + transitionType;
-      outgoingEl.className = "playerSlide outgoing trans-" + transitionType;
-      if (incomingEl.offsetWidth) { /* force reflow so the transition class change is picked up */ }
-      incomingEl.classList.add("active");
-      outgoingEl.classList.add("gone");
-      setTimeout(function () { outgoingEl.className = "playerSlide"; }, PLAYER_TRANSITION_MS);
+
+      if (transitionType === "dissolve") {
+        incomingEl.className = "playerSlide active";
+        incomingEl.style.zIndex = "1";
+        outgoingEl.className = "playerSlide active";
+        outgoingEl.style.zIndex = "2";
+        runDissolveTransition(outgoingEl, incomingEl, function () {
+          outgoingEl.className = "playerSlide";
+          outgoingEl.style.zIndex = "";
+          incomingEl.style.zIndex = "";
+        });
+      } else {
+        incomingEl.className = "playerSlide incoming trans-" + transitionType;
+        outgoingEl.className = "playerSlide outgoing trans-" + transitionType;
+        if (incomingEl.offsetWidth) { /* force reflow so the transition class change is picked up */ }
+        incomingEl.classList.add("active");
+        outgoingEl.classList.add("gone");
+        setTimeout(function () { outgoingEl.className = "playerSlide"; }, PLAYER_TRANSITION_MS);
+      }
+
       playerIndex = nextIndex;
       playerActiveIsA = !playerActiveIsA;
       schedulePlayerAdvance();
