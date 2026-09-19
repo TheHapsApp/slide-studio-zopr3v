@@ -253,6 +253,9 @@
     <div class="colorRow" id="drawColorRow"></div>
     <div class="sizeRow" id="drawSizeRow"></div>
     <div>
+      <button class="btn" id="drawEraserBtn">🧽 Eraser</button>
+    </div>
+    <div>
       <button class="btn" id="drawClearBtn">🧹 Clear</button>
       <button class="btn" id="drawCancelBtn">✖ Cancel</button>
       <button class="btn" id="drawDoneBtn">✅ Done</button>
@@ -659,10 +662,13 @@
     var drawColor = "#000000";
     var drawSizeKey = "medium";
     var isDrawing = false;
+    var eraserOn = false;
     var lastDrawX = 0, lastDrawY = 0;
+    function activeDrawColor() { return eraserOn ? "#ffffff" : drawColor; }
 
     function openDrawMode() {
       isDrawing = false; // always start each visit to the draw tool with drawing toggled off
+      eraserOn = false;
       var canvas = document.getElementById("drawSurface");
       canvas.width = 400; canvas.height = 300;
       drawCtx = canvas.getContext("2d");
@@ -678,6 +684,7 @@
       }
       renderDrawColorRow();
       renderDrawSizeRow();
+      renderEraserBtn();
       document.getElementById("drawOverlay").style.display = "flex";
     }
     function renderDrawColorRow() {
@@ -685,11 +692,14 @@
       row.innerHTML = "";
       TEXT_COLORS.forEach(function (c) {
         var sw = document.createElement("button");
-        sw.className = "colorSwatch" + (c === drawColor ? " selected" : "");
+        sw.className = "colorSwatch" + (!eraserOn && c === drawColor ? " selected" : "");
         sw.style.background = c;
-        sw.addEventListener("click", function () { drawColor = c; renderDrawColorRow(); });
+        sw.addEventListener("click", function () { drawColor = c; eraserOn = false; renderDrawColorRow(); renderEraserBtn(); });
         row.appendChild(sw);
       });
+    }
+    function renderEraserBtn() {
+      document.getElementById("drawEraserBtn").className = "btn" + (eraserOn ? " danger" : "");
     }
     function renderDrawSizeRow() {
       var row = document.getElementById("drawSizeRow");
@@ -1051,6 +1061,11 @@
     document.getElementById("bgPickerCloseBtn").addEventListener("click", closeBgPicker);
     document.getElementById("drawCancelBtn").addEventListener("click", closeDrawMode);
     document.getElementById("drawClearBtn").addEventListener("click", clearDrawing);
+    document.getElementById("drawEraserBtn").addEventListener("click", function () {
+      eraserOn = !eraserOn;
+      renderDrawColorRow();
+      renderEraserBtn();
+    });
     document.getElementById("drawDoneBtn").addEventListener("click", saveDrawing);
     document.getElementById("addTextBtn").addEventListener("click", addTextBox);
     document.getElementById("transitionBtn").addEventListener("click", cycleTransition);
@@ -1102,7 +1117,7 @@
         var p = canvasPoint(e, canvas);
         lastDrawX = p.x; lastDrawY = p.y;
         if (isDrawing) {
-          drawCtx.fillStyle = drawColor;
+          drawCtx.fillStyle = activeDrawColor();
           drawCtx.beginPath();
           drawCtx.arc(p.x, p.y, BRUSH_SIZES[drawSizeKey] / 2, 0, Math.PI * 2);
           drawCtx.fill();
@@ -1111,7 +1126,7 @@
       canvas.addEventListener("pointermove", function (e) {
         if (!isDrawing) return;
         var p = canvasPoint(e, canvas);
-        drawCtx.strokeStyle = drawColor;
+        drawCtx.strokeStyle = activeDrawColor();
         drawCtx.lineWidth = BRUSH_SIZES[drawSizeKey];
         drawCtx.beginPath();
         drawCtx.moveTo(lastDrawX, lastDrawY);
