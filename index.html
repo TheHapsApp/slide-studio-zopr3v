@@ -836,10 +836,16 @@
     // input is focused flips the unit to milliseconds (and back again on a second press), taking
     // over that key's normal cursor-move behavior so it always acts as the unit toggle.
     var durationUnitIsMs = false;
+    // Must stay comfortably above the longest transition (dissolve, DISSOLVE_TOTAL_MS=900ms) —
+    // a duration shorter than the transition itself makes advanceSlideshow() fire again before
+    // the in-flight transition finishes, stomping its classes/z-index mid-animation so slides
+    // just jump with no visible animation at all.
+    var MIN_SLIDE_DURATION_MS = 1000;
     function currentDurationInputMs() {
       var v = parseFloat(document.getElementById("durationInput").value);
       if (isNaN(v) || v < 0) v = 0;
-      return Math.round(durationUnitIsMs ? v : v * 1000);
+      var ms = Math.round(durationUnitIsMs ? v : v * 1000);
+      return Math.max(MIN_SLIDE_DURATION_MS, ms);
     }
     function renderDurationInput() {
       var ms = currentSlide().duration || PLAYER_ADVANCE_MS;
@@ -877,6 +883,7 @@
     function schedulePlayerAdvance() {
       if (playerTimer) clearTimeout(playerTimer);
       var dur = (slides[playerIndex] && slides[playerIndex].duration) || PLAYER_ADVANCE_MS;
+      dur = Math.max(MIN_SLIDE_DURATION_MS, dur); // safety net for any duration saved before this floor existed
       playerTimer = setTimeout(advanceSlideshow, dur);
     }
     // "Dissolve": random little squares of the outgoing slide reveal the incoming slide underneath,
