@@ -183,6 +183,7 @@
     <div id="toolRow">
       <button class="btn" id="addTextBtn">🔤 Add Text</button>
       <button class="btn" id="transitionBtn">🎞️ Fade</button>
+      <button class="btn" id="durationBtn">⏱️ 4s</button>
       <button class="btn danger" id="deleteSlideBtn">🗑️ Delete Slide</button>
     </div>
     <div id="slideFilmstrip"></div>
@@ -286,6 +287,7 @@
     var TRANSITIONS = ["none", "fade", "slide", "zoom", "dissolve"];
     var TRANSITION_LABELS = { none: "✋ None", fade: "🌫️ Fade", slide: "➡️ Slide", zoom: "🔍 Zoom", dissolve: "🧩 Dissolve" };
     var PLAYER_ADVANCE_MS = 4000;
+    var DURATION_OPTIONS = [2000, 3000, 4000, 5000, 6000, 8000, 10000];
     var PLAYER_TRANSITION_MS = 600;
     var DISSOLVE_COLS = 8;
     var DISSOLVE_ROWS = 6;
@@ -328,7 +330,7 @@
 
     function makeSlide() {
       slideIdCounter++;
-      return { id: "s" + slideIdCounter, background: { type: "color", value: BACKGROUND_PRESETS[0].css }, texts: [], transition: "fade" };
+      return { id: "s" + slideIdCounter, background: { type: "color", value: BACKGROUND_PRESETS[0].css }, texts: [], transition: "fade", duration: PLAYER_ADVANCE_MS };
     }
     function currentSlide() { return slides[currentSlideIndex]; }
 
@@ -562,6 +564,7 @@
     function renderEditorSlide() {
       renderSlideInto(document.getElementById("slideCanvas"), currentSlide(), true);
       document.getElementById("transitionBtn").textContent = "🎞️ " + TRANSITION_LABELS[currentSlide().transition];
+      document.getElementById("durationBtn").textContent = "⏱️ " + ((currentSlide().duration || PLAYER_ADVANCE_MS) / 1000) + "s";
       document.getElementById("deleteSlideBtn").disabled = slides.length <= 1;
     }
     function renderFilmstrip() {
@@ -646,6 +649,7 @@
     var lastDrawX = 0, lastDrawY = 0;
 
     function openDrawMode() {
+      isDrawing = false; // always start each visit to the draw tool with drawing toggled off
       var canvas = document.getElementById("drawSurface");
       canvas.width = 400; canvas.height = 300;
       drawCtx = canvas.getContext("2d");
@@ -814,6 +818,15 @@
       editingTextId = null;
     }
 
+    // ---------------- slide duration (how long this slide stays up in the player) ----------------
+    function cycleDuration() {
+      var s = currentSlide();
+      var idx = DURATION_OPTIONS.indexOf(s.duration || PLAYER_ADVANCE_MS);
+      s.duration = DURATION_OPTIONS[(idx + 1) % DURATION_OPTIONS.length];
+      document.getElementById("durationBtn").textContent = "⏱️ " + (s.duration / 1000) + "s";
+      persistProject();
+    }
+
     // ---------------- transitions ----------------
     function cycleTransition() {
       var s = currentSlide();
@@ -843,7 +856,8 @@
     }
     function schedulePlayerAdvance() {
       if (playerTimer) clearTimeout(playerTimer);
-      playerTimer = setTimeout(advanceSlideshow, PLAYER_ADVANCE_MS);
+      var dur = (slides[playerIndex] && slides[playerIndex].duration) || PLAYER_ADVANCE_MS;
+      playerTimer = setTimeout(advanceSlideshow, dur);
     }
     // "Dissolve": random little squares of the outgoing slide reveal the incoming slide underneath,
     // one by one, until the whole screen has become the next slide. Built with a canvas-generated
@@ -989,6 +1003,7 @@
     document.getElementById("drawDoneBtn").addEventListener("click", saveDrawing);
     document.getElementById("addTextBtn").addEventListener("click", addTextBox);
     document.getElementById("transitionBtn").addEventListener("click", cycleTransition);
+    document.getElementById("durationBtn").addEventListener("click", cycleDuration);
     document.getElementById("deleteSlideBtn").addEventListener("click", deleteCurrentSlide);
     document.getElementById("textDoneBtn").addEventListener("click", saveTextEdit);
     document.getElementById("textDeleteBtn").addEventListener("click", deleteEditingText);
@@ -1012,13 +1027,23 @@
     });
 
     (function () {
+      // "isDrawing" here means "drawing is toggled on" (not "button is held") — a click/tap
+      // starts the color following the cursor without holding the button down, and clicking
+      // again stops it. pointerenter repositions the pen without drawing a stray line across
+      // the gap whenever the cursor re-enters the canvas mid-drawing (e.g. after leaving and
+      // coming back while still toggled on).
       var canvas = document.getElementById("drawSurface");
       canvas.addEventListener("pointerdown", function (e) {
         e.preventDefault();
-        isDrawing = true;
+        isDrawing = !isDrawing;
         var p = canvasPoint(e, canvas);
         lastDrawX = p.x; lastDrawY = p.y;
-        if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+        if (isDrawing) {
+          drawCtx.fillStyle = drawColor;
+          drawCtx.beginPath();
+          drawCtx.arc(p.x, p.y, BRUSH_SIZES[drawSizeKey] / 2, 0, Math.PI * 2);
+          drawCtx.fill();
+        }
       });
       canvas.addEventListener("pointermove", function (e) {
         if (!isDrawing) return;
@@ -1031,8 +1056,11 @@
         drawCtx.stroke();
         lastDrawX = p.x; lastDrawY = p.y;
       });
-      canvas.addEventListener("pointerup", function () { isDrawing = false; });
-      canvas.addEventListener("pointerleave", function () { isDrawing = false; });
+      canvas.addEventListener("pointerenter", function (e) {
+        if (!isDrawing) return;
+        var p = canvasPoint(e, canvas);
+        lastDrawX = p.x; lastDrawY = p.y;
+      });
     })();
 
     loadProjectsFromStorage();
